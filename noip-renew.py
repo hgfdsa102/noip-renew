@@ -148,7 +148,13 @@ class SlackDebugLog(metaclass=SingletonType):
         )
 
 
-LOG = None
+slack_token = int(os.environ.get('SLACK_TOKEN', ''))
+slack_channel = int(os.environ.get('SLACK_CHANNEL', ''))
+if slack_token and slack_channel:
+    LOG = SlackDebugLog(time=True, slack_token=slack_token, slack_channel=slack_channel)
+else:
+    sys.exit("slack env not exist")
+
 
 class Logger:
     def __init__(self, level):
@@ -390,18 +396,14 @@ def main(argv=None):
         noip_username = os.environ.get('NOIP_USERNAME', '')
         noip_password = os.environ.get('NOIP_PASSWORD', '')
         noip_totp = os.environ.get('NOIP_2FA_SECRET_KEY', '')
-        slack_token = int(os.environ.get('SLACK_TOKEN', ''))
-        slack_channel = int(os.environ.get('SLACK_CHANNEL', ''))
         debug = int(os.environ.get('NOIP_DEBUG', 1))
-        if not any([noip_username, noip_password, noip_totp, slack_token, slack_channel]):
+        if not any([noip_username, noip_password, noip_totp]):
             sys.exit(
                 'You are using docker, you need to specify the required parameters as environment varialbes, check the documentation.')
 
     else:
-        noip_username, noip_password, noip_totp, debug, slack_token, slack_channel = get_args_values(argv)
+        noip_username, noip_password, noip_totp, debug = get_args_values(argv)
 
-    global LOG
-    LOG = SlackDebugLog(time=True, slack_token=slack_token, slack_channel=slack_channel)
     return (Robot(noip_username, noip_password, noip_totp, debug, DOCKER)).run()
 
 
@@ -410,18 +412,16 @@ def get_args_values(argv):
         argv = sys.argv
     if len(argv) < 4:
         print(
-            f"Usage: {argv[0]} <noip_username> <noip_base64encoded_password> <2FA_secret_key> <slack_token> <slack_channel> [<debug-level>] ")
+            f"Usage: {argv[0]} <noip_username> <noip_base64encoded_password> <2FA_secret_key> [<debug-level>] ")
         sys.exit(1)
 
     noip_username = argv[1]
     noip_password = argv[2]
     noip_totp = argv[3]
-    slack_token = argv[4]
-    slack_channel = argv[5]
     debug = 1
-    if len(argv) > 5:
-        debug = int(argv[6])
-    return noip_username, noip_password, noip_totp, slack_token, slack_channel, debug
+    if len(argv) > 3:
+        debug = int(argv[4])
+    return noip_username, noip_password, noip_totp, debug
 
 
 if __name__ == "__main__":
