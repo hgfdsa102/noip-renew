@@ -382,7 +382,6 @@ class Robot:
         return rc
 
 
-@LOG.logging()
 def main(argv=None):
     # check if we're running on docker
     DOCKER = os.environ.get("CONTAINER", "").lower() in ("yes", "y", "on", "true", "1")
@@ -406,7 +405,6 @@ def main(argv=None):
     return (Robot(noip_username, noip_password, noip_totp, debug, DOCKER)).run()
 
 
-@LOG.logging()
 def get_args_values(argv):
     if argv is None:
         argv = sys.argv
