@@ -1,1 +1,1 @@
-docker build -f Dockerfile -t renew-noip-py12:latest
+docker build -f Dockerfile -t renew-noip-py12:latest .
