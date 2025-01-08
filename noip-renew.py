@@ -148,8 +148,8 @@ class SlackDebugLog(metaclass=SingletonType):
         )
 
 
-slack_token = int(os.environ.get('SLACK_TOKEN', ''))
-slack_channel = int(os.environ.get('SLACK_CHANNEL', ''))
+slack_token = str(os.environ.get('SLACK_TOKEN', ''))
+slack_channel = str(os.environ.get('SLACK_CHANNEL', ''))
 if slack_token and slack_channel:
     LOG = SlackDebugLog(time=True, slack_token=slack_token, slack_channel=slack_channel)
 else:
