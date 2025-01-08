@@ -13,8 +13,6 @@ RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/` c
 RUN unzip /tmp/chromedriver.zip chromedriver -d /home/app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY /noip-renew.py /home/loblab/
-ENTRYPOINT ["python3", "/home/loblab/noip-renew.py"]
 
 COPY /noip-renew.py /home/app/
 ENTRYPOINT ["python3", "/home/app/noip-renew.py"]
