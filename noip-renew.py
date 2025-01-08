@@ -148,8 +148,7 @@ class SlackDebugLog(metaclass=SingletonType):
         )
 
 
-global LOG
-
+LOG = None
 
 class Logger:
     def __init__(self, level):
@@ -402,6 +401,7 @@ def main(argv=None):
     else:
         noip_username, noip_password, noip_totp, debug, slack_token, slack_channel = get_args_values(argv)
 
+    global LOG
     LOG = SlackDebugLog(time=True, slack_token=slack_token, slack_channel=slack_channel)
     return (Robot(noip_username, noip_password, noip_totp, debug, DOCKER)).run()
 
