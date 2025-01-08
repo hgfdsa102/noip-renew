@@ -1,0 +1,1 @@
+docker run --rm --shm-size=256m --env-file config.env <image-id>

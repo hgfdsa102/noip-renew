@@ -1,24 +1,20 @@
-FROM debian
-LABEL maintainer="loblab"
+FROM python:3.12-slim-bookworm
 
 ARG DEBIAN_FRONTED=noninteractive
 ARG PYTHON=python3
-
 ENV CONTAINER=1
 
-RUN apt-get update && apt-get -y upgrade
-RUN apt-get -y install chromium-chromedriver || \
-    apt-get -y install chromium-driver || \
-    apt-get -y install chromedriver
-RUN apt-get -y install ${PYTHON}-pip
-RUN apt-get -y install ${PYTHON}-selenium
-RUN apt-get -y install ${PYTHON}-pyotp
-RUN apt-get -y install curl wget
-
-RUN mkdir -p /home/loblab && \
-    useradd -d /home/loblab -u 1001 loblab && \
-    chown loblab:loblab /home/loblab
-USER loblab
-WORKDIR /home/loblab
+WORKDIR /home/app
+RUN apt-get -y update
+RUN apt -y install wget unzip curl
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN apt -y install ./google-chrome-stable_current_amd64.deb
+RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/` curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
+RUN unzip /tmp/chromedriver.zip chromedriver -d /home/app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 COPY /noip-renew.py /home/loblab/
 ENTRYPOINT ["python3", "/home/loblab/noip-renew.py"]
+
+COPY /noip-renew.py /home/app/
+ENTRYPOINT ["python3", "/home/app/noip-renew.py"]
