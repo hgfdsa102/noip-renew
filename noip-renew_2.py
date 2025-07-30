@@ -268,52 +268,35 @@ class Robot:
 
         hosts = self.get_hosts()
         for host in hosts:
-            try:
-                host_link = self.get_host_link(host, iteration)  # This is for if we wanted to modify our Host IP.
-                host_name = host_link.text
+            host_link = self.get_host_link(host, iteration)  # This is for if we wanted to modify our Host IP.
+            host_name = host_link.text
+            expiration_days = self.get_host_expiration_days(host, iteration)
+            if expiration_days <= 7:
+                host_button = self.get_host_button(host, iteration)  # This is the button to confirm our free host
+                self.update_host(host_button, host_name)
                 expiration_days = self.get_host_expiration_days(host, iteration)
-
-                if expiration_days <= 7:
-                    try:
-                        host_button = self.get_host_button(host, iteration)  # This is the button to confirm our free host
-                        self.update_host(host_button, host_name)
-                        expiration_days = self.get_host_expiration_days(host, iteration)
-                        next_renewal.append(expiration_days)
-                        self.logger.log(f"{host_name} expires in {str(expiration_days)} days")
-                        LOG.info(f"{host_name} expires in {str(expiration_days)} days")
-                        count += 1
-                    except Exception as e:
-                        self.logger.log(f"Could not update host {host_name}: {str(e)}")
-                        LOG.info(f"Could not update host {host_name}: {str(e)}")
-                        next_renewal.append(expiration_days)
-                else:
-                    next_renewal.append(expiration_days)
-                    self.logger.log(f"{host_name} expires in {str(expiration_days)} days")
-                    LOG.info(f"{host_name} expires in {str(expiration_days)} days")
-            except Exception as e:
-                self.logger.log(f"Error processing host in iteration {iteration}: {str(e)}")
-                LOG.info(f"Error processing host in iteration {iteration}: {str(e)}")
-                # Continue with next host
+                next_renewal.append(expiration_days)
+                self.logger.log(f"{host_name} expires in {str(expiration_days)} days")
+                LOG.info(f"{host_name} expires in {str(expiration_days)} days")
+                count += 1
+            else:
+                next_renewal.append(expiration_days)
+                self.logger.log(f"{host_name} expires in {str(expiration_days)} days")
+                LOG.info(f"{host_name} expires in {str(expiration_days)} days")
             iteration += 1
         # self.browser.save_screenshot("results.png")
         self.logger.log(f"Confirmed hosts: {count}", 2)
         LOG.info(f"Confirmed hosts: {count}")
-
-        if next_renewal:
-            nr = min(next_renewal) - 6
-            today = date.today() + timedelta(days=nr)
-            day = str(today.day)
-            month = str(today.month)
-            if not self.docker:
-                try:
-                    subprocess.call(['/usr/local/bin/noip-renew-skd.sh', day, month, "True"])
-                except (FileNotFoundError, PermissionError):
-                    self.logger.log(f"noip-renew-skd.sh missing or not executable, skipping crontab configuration")
-                    LOG.info(f"noip-renew-skd.sh missing or not executable, skipping crontab configuration")
-        else:
-            self.logger.log("No hosts found to process")
-            LOG.info("No hosts found to process")
-
+        nr = min(next_renewal) - 6
+        today = date.today() + timedelta(days=nr)
+        day = str(today.day)
+        month = str(today.month)
+        if not self.docker:
+            try:
+                subprocess.call(['/usr/local/bin/noip-renew-skd.sh', day, month, "True"])
+            except (FileNotFoundError, PermissionError):
+                self.logger.log(f"noip-renew-skd.sh missing or not executable, skipping crontab configuration")
+                LOG.info(f"noip-renew-skd.sh missing or not executable, skipping crontab configuration")
         return True
 
     @LOG.logging()
@@ -322,14 +305,8 @@ class Robot:
         LOG.info(f"Opening {Robot.HOST_URL}...")
         try:
             self.browser.get(Robot.HOST_URL)
-            # Wait for the page to load
-            WebDriverWait(self.browser, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            # Additional wait to ensure dynamic content is loaded
-            time.sleep(2)
         except TimeoutException as e:
-            self.browser.save_screenshot("timeout.png")
+            # self.browser.save_screenshot("timeout.png")
             self.logger.log(f"Timeout: {str(e)}")
             LOG.info(f"Timeout: {str(e)}")
 
@@ -353,124 +330,34 @@ class Robot:
     @staticmethod
     @LOG.logging()
     def get_host_expiration_days(host, iteration):
-        # Try multiple ways to find expiration days
-        selectors = [
-            ".//a[contains(@class,'no-link-style')]",
-            ".//span[contains(@class,'days-remaining')]",
-            ".//td[contains(@class,'expiration')]",
-            ".//td[4]",  # Often expiration is in 4th column
-            ".//td[5]",  # Sometimes in 5th column
-        ]
-
-        for selector in selectors:
-            try:
-                element = host.find_element(By.XPATH, selector)
-
-                # Check data-original-title attribute first
-                title = element.get_attribute("data-original-title")
-                if title:
-                    regex_match = re.search("\\d+", title)
-                    if regex_match:
-                        return int(regex_match.group(0))
-
-                # Then check text content
-                if element.text:
-                    regex_match = re.search("\\d+", element.text)
-                    if regex_match:
-                        return int(regex_match.group(0))
-            except:
-                continue
-
-        # If we can't find expiration days, log warning and return 0
-        print(f"Warning: Could not find expiration days for host in iteration {iteration}")
-        return 0
+        try:
+            host_remaining_days = host.find_element(By.XPATH, ".//a[contains(@class,'no-link-style')]")
+        except:
+            return 0
+        if host_remaining_days.get_attribute("data-original-title") is not None:
+            regex_match = re.search("\\d+", host_remaining_days.get_attribute("data-original-title"))
+        else:
+            regex_match = re.search("\\d+", host_remaining_days.text)
+        if regex_match is None:
+            raise Exception("Expiration days label does not match the expected pattern in iteration: {iteration}")
+        expiration_days = int(regex_match.group(0))
+        return expiration_days
 
     @staticmethod
     @LOG.logging()
     def get_host_link(host, iteration):
-        # Try multiple selectors for host link
-        selectors = [
-            ".//a[@class='link-info cursor-pointer notranslate']",
-            ".//a[contains(@class, 'link-info')]",
-            ".//a[contains(@class, 'host-name')]",
-            ".//td[1]//a",
-            ".//a"
-        ]
-
-        for selector in selectors:
-            try:
-                link = host.find_element(By.XPATH, selector)
-                if link.text:  # Make sure we found a link with text
-                    return link
-            except:
-                continue
-
-        # If no link found, try to get text directly from td
-        try:
-            return host.find_element(By.XPATH, ".//td[1]")
-        except:
-            raise Exception(f"Could not find host link in iteration {iteration}")
+        return host.find_element(By.XPATH, ".//a[@class='link-info cursor-pointer notranslate']")
 
     @staticmethod
     @LOG.logging()
     def get_host_button(host, iteration):
-        # Try multiple selectors for the confirm/update button
-        selectors = [
-            ".//button[contains(@class, 'btn-success')]",
-            ".//button[contains(@class, 'btn-confirm')]",
-            ".//button[contains(text(), 'Confirm')]",
-            ".//button[contains(text(), 'Update')]",
-            ".//td[last()]//button",  # Often button is in last column
-            "//td[6]/button[contains(@class, 'btn-success')]"  # Original selector
-        ]
-
-        for selector in selectors:
-            try:
-                button = host.find_element(By.XPATH, selector)
-                if button.is_enabled():
-                    return button
-            except:
-                continue
-
-        raise Exception(f"Could not find update button for host in iteration {iteration}")
+        return host.find_element(By.XPATH, "//td[6]/button[contains(@class, 'btn-success')]")
 
     @LOG.logging()
     def get_hosts(self):
-        # Wait for page to load completely
-        try:
-            WebDriverWait(self.browser, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//table[@class='table']"))
-            )
-        except:
-            self.logger.log("Table not found, saving screenshot for debugging")
-            self.browser.save_screenshot("no_table_found.png")
-
-        # Debug: Log the page source to understand the structure
-        if self.debug > 0:
-            with open("page_source.html", "w", encoding="utf-8") as f:
-                f.write(self.browser.page_source)
-            self.logger.log("Page source saved to page_source.html")
-
-        # Try multiple selectors to find hosts
         host_tds = self.browser.find_elements(By.XPATH, "//td[@data-title=\"Host\"]")
-
-        # If no hosts found with first selector, try alternative selectors
         if len(host_tds) == 0:
-            # Try to find any table rows that might contain host information
-            host_tds = self.browser.find_elements(By.XPATH, "//table//tr[contains(@class, 'host-row')]")
-
-        if len(host_tds) == 0:
-            # Try another common pattern
-            host_tds = self.browser.find_elements(By.XPATH, "//tbody//tr")
-            # Filter out header rows
-            host_tds = [td for td in host_tds if td.find_elements(By.TAG_NAME, "td")]
-
-        if len(host_tds) == 0:
-            self.browser.save_screenshot("no_hosts_found.png")
-            self.logger.log("No hosts found. Check no_hosts_found.png screenshot")
             raise Exception("No hosts or host table rows not found")
-
-        self.logger.log(f"Found {len(host_tds)} hosts")
         return host_tds
 
     @LOG.logging()
